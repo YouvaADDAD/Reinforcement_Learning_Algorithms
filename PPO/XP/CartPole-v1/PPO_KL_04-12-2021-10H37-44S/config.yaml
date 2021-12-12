@@ -1,0 +1,19 @@
+Lambda: 0.99
+capacity: 10000
+env: CartPole-v1
+explo: 0.1
+featExtractor: !!python/name:core.NothingToDo ''
+freqOptim: 4000
+freqSave: 1000
+freqTest: 10
+freqVerbose: 10
+fromFile: null
+gamma: 0.99
+lr_pi: 0.0001
+lr_v: 0.0003
+maxLengthTest: 500
+maxLengthTrain: 500
+nbEpisodes: 1000000
+nbTest: 1
+optimStep: 10
+seed: 5

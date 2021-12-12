@@ -1,0 +1,21 @@
+env: MountainCarContinuous-v0                                               # environnement
+seed: 5
+freqSave: 1000
+freqTest: 10
+nbTest: 1
+freqVerbose: 10
+freqOptim: 1000                                                                          # Optimisation de la politique tous les freqOptim evenements
+fromFile: null
+nbEpisodes: 1000000
+maxLengthTest: 200                                                                    # Longueur maxi des trajectoires en Test
+maxLengthTrain: 200
+batch_size: 100
+capacity: 1000000
+lr_pi: 0.001
+lr_q: 0.001
+lr_alpha: 0.001
+entropy_0: 0.2
+gamma: 0.99
+ru: 0.995
+alpha: 0.2
+update_many: 10

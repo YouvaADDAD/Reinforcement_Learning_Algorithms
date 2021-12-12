@@ -1,0 +1,19 @@
+env: LunarLanderContinuous-v2
+seed: 5
+freqSave: 1000
+freqTest: 10
+nbTest: 1
+freqVerbose: 10
+freqOptim: 1000                                                                          # Optimisation de la politique tous les freqOptim evenements
+fromFile: null
+nbEpisodes: 100000
+maxLengthTest: 1000                                                                    # Longueur maxi des trajectoires en Test
+maxLengthTrain: 1000
+lr_pi: 0.001
+lr_q: 0.003
+gamma: 0.99
+optimStep: 5
+capacity: 100000 
+ru: 0.99
+batch_size: 1280
+
