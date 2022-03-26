@@ -80,7 +80,7 @@ class ActorCritic(nn.Module):
         self.q=Critic(self.n_state,self.n_action,layers=layers,activation=activation,dropout=dropout,use_batch_norm=use_batch_norm)
 
 class DDPG(object):
-    def __init__(self, env,opt,layers=[30,30],sigma=0.15,activation=nn.LeakyReLU,use_batch_norm=False):
+    def __init__(self, env,opt,layers=[30,30],sigma=0.15,activation=nn.LeakyReLU):
         #Environment 
         self.env=env
         self.opt=opt
@@ -90,7 +90,8 @@ class DDPG(object):
         self.n_action = self.action_space.shape[0]
         self.high=self.action_space.high[0]
         self.low=self.action_space.low[0]
-
+        self.use_batch_norm=opt.use_batch_norm
+        self.prior=opt.prior
         #Parameters
         self.gamma=opt.gamma
         self.ru=opt.ru
@@ -99,7 +100,7 @@ class DDPG(object):
         #Buffer
         self.batch_size=opt.batch_size
         self.capacity=opt.capacity
-        self.events=Memory(self.capacity,prior=False)
+        self.events=Memory(self.capacity,prior=self.prior)
 
         #Compteur
         self.nbEvents=0
@@ -108,7 +109,7 @@ class DDPG(object):
         self.N=Orn_Uhlen(self.n_action,sigma=sigma)
         self.sigma=sigma
         #Initialize target network Q′ and μ′ with weights θQ′ ← θQ, θμ′ ← θμ
-        self.model=ActorCritic(self.n_state,self.n_action,self.high,layers=layers,activation=activation,use_batch_norm=use_batch_norm)
+        self.model=ActorCritic(self.n_state,self.n_action,self.high,layers=layers,activation=activation,use_batch_norm=self.use_batch_norm)
         self.target=deepcopy(self.model)
 
         #Freeze target network pour ne pas le mettre a jour
@@ -153,7 +154,8 @@ class DDPG(object):
         if self.test:
             return False
         self.nbEvents+=1
-        return self.nbEvents%self.opt.freqOptim==0 #and  self.nbEvents%self.optim_step==0
+        return self.nbEvents>self.opt.freqOptim and self.nbEvents%self.optim_step==0 #self.nbEvents%self.opt.freqOptim== 0  
+        
 
     def learn(self):
         if self.test:
@@ -199,7 +201,7 @@ class DDPG(object):
             
 
 if __name__ == '__main__':
-    env, config, outdir, logger = init('./configs/config_mountainCar.yaml', "DDPG")
+    env, config, outdir, logger = init('./configs/config_mountainCar.yaml', "DDPG_lunar_batch_norm_true")
     freqTest = config["freqTest"]
     freqSave = config["freqSave"]
     nbTest = config["nbTest"]
@@ -208,7 +210,7 @@ if __name__ == '__main__':
     torch.manual_seed(config["seed"])
     episode_count = config["nbEpisodes"]
 
-    agent = DDPG(env,config,use_batch_norm=True,layers=[64,64,32,32])
+    agent = DDPG(env,config,layers=[30,30])
 
 
     rsum = 0

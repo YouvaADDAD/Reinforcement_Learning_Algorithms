@@ -58,8 +58,15 @@ class A2C(object):
         self.model=ActorCritic(self.env.observation_space.shape[0],self.action_space.n , layers=layers,finalActivation=nn.Softmax(dim=1), activation=torch.tanh,dropout=0.0)
         self.target=deepcopy(self.model)
 
+        #Histoire d'etre sur de ne pas mettre a jour le target
+        for param in self.target.parameters():
+            param.requires_grad=False
+
         #Optimizer
-        self.optim=torch.optim.Adam(params=self.model.parameters(),weight_decay=0.0,lr=opt.lr)
+        self.optim=torch.optim.RMSprop(params=self.model.parameters(),weight_decay=0.0,lr=opt.lr,alpha=0.99)
+        #self.optim=torch.optim.Adam(params=self.model.parameters(),weight_decay=0.0,lr=opt.lr)
+        #self.optim=torch.optim.SGD(params=self.model.parameters(),weight_decay=0.0,lr=opt.lr,momentum=0.9)
+
 
         #Loss
         self.loss=nn.SmoothL1Loss()
@@ -88,15 +95,21 @@ class A2C(object):
                 done=False
             self.events.append((obs,action,reward,new_obs,done))
     
+    def timeToLearn(self,done):
+        if self.test:
+            return False
+        self.nbEvents+=1
+        return self.nbEvents%self.opt.freqOptim == 0
 
     #########sum gamma reward#####
-    def discount_rewards(self,rewards,dones):
-        discount_reward = 0.
-        returns = []
-        for step in reversed(range(len(rewards))):
-            discount_reward = rewards[step] + self.gamma * discount_reward * (1-dones[step])
-            returns.append(discount_reward)
-        return torch.tensor(returns[::-1])
+    def reward_To_go(self,rewards,dones):
+        with torch.no_grad():
+            discount_reward = 0.
+            returns = []
+            for step in reversed(range(len(rewards))):
+                discount_reward = rewards[step] + self.gamma * discount_reward * (1-dones[step])
+                returns.append(discount_reward)
+            return torch.tensor(returns[::-1])
     
     def learn(self):
         if self.test:
@@ -111,7 +124,7 @@ class A2C(object):
             values,policy_dist=self.model(ls0)
             logprobs=policy_dist.log_prob(la).view(len(self.events),-1)
             ##################################################################################################
-            returns=self.discount_rewards(lr,ld).view(len(self.events),-1)
+            returns=self.reward_To_go(lr,ld).view(len(self.events),-1)
             advantage=returns-values
             ##################################################################################################
             actor_loss=-torch.mean(logprobs*advantage.detach())
@@ -127,7 +140,7 @@ if __name__ == '__main__':
     #config_random_gridworld.yaml
     #config_random_cartpole.yaml
     #config_random_lunar.yaml
-    env, config, outdir, logger = init('./configs/config_random_cartpole.yaml', "A2C")
+    env, config, outdir, logger = init('./configs/config_random_lunar.yaml', "A2C_lunar")
     freqTest = config["freqTest"]
     freqSave = config["freqSave"]
     nbTest = config["nbTest"]
@@ -148,7 +161,6 @@ if __name__ == '__main__':
         checkConfUpdate(outdir, config)
 
         rsum = 0
-        agent.nbEvents = 0
         ob = env.reset()
 
          # On souhaite afficher l'environnement (attention à ne pas trop afficher car çà ralentit beaucoup)
@@ -201,11 +213,12 @@ if __name__ == '__main__':
             if done:
                 print(str(i) + " rsum=" + str(rsum) + ", " + str(j) + " actions ")
                 logger.direct_write("reward", rsum, i)
-                agent.nbEvents = 0
                 mean += rsum
                 rsum = 0
                 break
+        #On le fait a chaque fin de trajectoire afin de calculer le reward to go
         agent.learn()
+        
         
 
     env.close()

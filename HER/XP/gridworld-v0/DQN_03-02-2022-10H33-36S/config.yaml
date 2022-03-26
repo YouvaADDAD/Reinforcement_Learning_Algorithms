@@ -1,0 +1,31 @@
+C: 1000
+batch_size: 1000
+capacity: 1000000
+decay: 0.99999
+env: gridworld-v0
+execute: env.setPlan(config["map"], config["rewards"])
+explo: 0.2
+featExtractor: !!python/name:core.MapFromDumpExtractor4 ''
+freqOptim: 10
+freqSave: 1000
+freqTest: 10
+freqVerbose: 10
+fromFile: null
+gamma: 0.99
+lr: 0.001
+map: gridworldPlans&Goals/plan2Multi.txt
+maxLengthTest: 500
+maxLengthTrain: 100
+n_sampels: 4
+nbEpisodes: 1000000
+nbTest: 1
+prior: false
+rewards:
+  0: -0.001
+  3: 1
+  4: 1
+  5: -1
+  6: -1
+seed: 5
+startEvents: 1000
+target: true

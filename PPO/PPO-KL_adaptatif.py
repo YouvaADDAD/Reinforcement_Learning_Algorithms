@@ -67,7 +67,7 @@ class Buffer(object):
         return len(self.observations)
 
 class PPO(object):
-    def __init__(self, env,opt,layers=[30,30],K=30,beta=1,delta=0.5):
+    def __init__(self, env,opt,layers=[30,30]):
          #Environment 
         self.env=env
         self.opt=opt
@@ -86,16 +86,16 @@ class PPO(object):
         self.nbEvents=0
 
         #Parameters PPO
-        self.K=K
-        self.beta=beta
-        self.delta=delta
+        self.K=opt.K
+        self.beta=opt.beta
+        self.delta=opt.delta
     
         #Actor Critic
         self.model=ActorCritic(self.env.observation_space.shape[0],self.action_space.n , layers=layers,finalActivation=nn.Softmax(dim=1), activation=torch.tanh,dropout=0.0)
 
         #Optimiseur & Loss
         self.loss=nn.SmoothL1Loss()
-        self.kl=nn.KLDivLoss(log_target=True)
+        self.kl=nn.KLDivLoss(reduction = 'batchmean')
         self.policy_optim=torch.optim.Adam(self.model.actor.parameters(),weight_decay=0.0,lr=opt.lr_pi)
         self.critic_optim=torch.optim.Adam(self.model.critic.parameters(),weight_decay=0.0,lr=opt.lr_v)
     
@@ -128,20 +128,21 @@ class PPO(object):
         return action.item(),values,dist.log_prob(action)
 
     def discount_rewards_(self,rewards,dones,values):
-        next_value=0
-        gae=0.
-        returns=[]
-        for step in reversed(range(len(rewards))):
-            TD=rewards[step]+self.gamma*next_value*(1-dones[step])-values[step]
-            gae=TD+self.gamma*self.Lambda*(1-dones[step])*gae
-            next_value= values[step]
-            returns.append(gae+values[step])
-        return torch.tensor(returns[::-1])
-    
-    def learn(self):
-        if self.test:
-            pass
+        with torch.no_grad():
+            next_value=0
+            gae=0.
+            returns=[]
+            for step in reversed(range(len(rewards))):
+                TD=rewards[step]+self.gamma*next_value*(1-dones[step])-values[step]
+                gae=TD+self.gamma*self.Lambda*(1-dones[step])*gae
+                next_value= values[step]
+                returns.append(gae+values[step])
+            return torch.tensor(returns[::-1])
         
+    def learn(self):
+        self.nbEvents+=1
+        if self.test:
+            pass 
         else:
             old_states,actions,rewards,dones,old_values,old_logprobs=self.events.sample()
             old_states=torch.FloatTensor(old_states).squeeze(1)
@@ -150,18 +151,20 @@ class PPO(object):
             dones=torch.FloatTensor(dones)
             old_values=torch.FloatTensor(old_values)
             old_logprobs=torch.FloatTensor(old_logprobs)
-            returns=self.discount_rewards_(rewards,dones,old_values.detach())
+            returns=self.discount_rewards_(rewards,dones,old_values)
             advantage=returns-old_values
+            old_probs=self.model(old_states)[1].probs.detach() 
             ###############################################################################
             for _ in range(self.K):
-                new_values,new_policy_dist = self.model(old_states)    
+                new_values,new_policy_dist = self.model(old_states)
+                new_logits=new_policy_dist.logits  
                 new_logprobs=new_policy_dist.log_prob(actions)
                 new_values=new_values.squeeze(-1) 
-                #with torch.no_grad(): 
-                #    advantage=returns-new_values
                 ########################################
                 ratio=torch.exp(new_logprobs-old_logprobs)
-                divergence=torch.nn.functional.kl_div(new_logprobs,torch.exp(old_logprobs))
+                #divergence=torch.nn.functional.kl_div(new_logprobs,torch.exp(old_logprobs))
+                divergence=self.kl(new_logits,old_probs)
+                #divergence=(torch.exp(new_logprobs)*(new_logprobs-old_logprobs)).mean()
                 logger.direct_write("divergence", divergence, self.nbEvents)
                 ########################################
                 actor_loss=-torch.mean(ratio*advantage)+self.beta*(divergence)
@@ -179,11 +182,13 @@ class PPO(object):
             if divergence<= self.delta/1.5:
                 self.beta=0.5*self.beta
             ########################################
-            new_values,new_policy_dist = self.model(old_states) 
-            critic_loss=self.loss(returns,new_values)
-            self.critic_optim.zero_grad()
-            critic_loss.backward()
-            self.critic_optim.step()
+            for _ in range(self.K):
+                new_values,_ = self.model(old_states)
+                new_values=new_values.squeeze(-1)  
+                critic_loss=self.loss(new_values,returns)
+                self.critic_optim.zero_grad()
+                critic_loss.backward()
+                self.critic_optim.step()
             self.events.reset()
 
 
@@ -191,7 +196,7 @@ if __name__ == '__main__':
     #config_random_gridworld.yaml
     #config_random_cartpole.yaml
     #config_random_lunar.yaml
-    env, config, outdir, logger = init('./configs/config_random_cartpole.yaml', "PPO_KL")
+    env, config, outdir, logger = init('./configs/config_random_lunar.yaml', "PPO_compare_KL")
     freqTest = config["freqTest"]
     freqSave = config["freqSave"]
     nbTest = config["nbTest"]
@@ -261,14 +266,18 @@ if __name__ == '__main__':
             agent.store(ob, action,reward,done,value,log_prob,j)
             rsum += reward
 
-            if agent.timeToLearn(done):
-                agent.learn()
+            #if agent.timeToLearn(done):
+            #    agent.learn()
+
             if done:
                 print(str(i) + " rsum=" + str(rsum) + ", " + str(j) + " actions ")
                 logger.direct_write("reward", rsum, i)
                 mean += rsum
                 rsum = 0
                 break
+        
+        agent.learn()
+            
 
     env.close()
 

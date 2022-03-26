@@ -1,0 +1,16 @@
+env: LunarLander-v2
+activation: !!python/name:torch.nn.Tanh
+finalActivation: !!python/name:torch.nn.Softmax
+freqSave: 1000
+freqTest: 10
+nbTest: 1
+freqVerbose: 10
+freqOptim: 100                                                                          
+fromFile: null
+nbEpisodes: 200000
+lr: 0.003
+layers:              
+- 64
+- 32
+seed: 5
+batchsize: 298

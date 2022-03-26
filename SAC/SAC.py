@@ -195,7 +195,7 @@ class SAC(object):
                         param_target.data.add_((1-self.ru)*param.data)
 
 if __name__ == '__main__':
-    env, config, outdir, logger = init('./configs/config_mountainCar.yaml', "SAC")
+    env, config, outdir, logger = init('./configs/config-Pendulum.yaml', "SAC")
     freqTest = config["freqTest"]
     freqSave = config["freqSave"]
     nbTest = config["nbTest"]

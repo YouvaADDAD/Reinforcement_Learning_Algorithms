@@ -85,7 +85,7 @@ class NoisyNN(nn.Module):
         return self.model(input)
 
 class NoisyDQN(object):
-    def __init__(self, env,opt,layers=[200],activation=nn.Tanh,dropout=0.0,prior=True):
+    def __init__(self, env,opt,layers=[200],activation=nn.Tanh,dropout=0.0):
         super().__init__()
         #Les hyperparametres
         self.opt=opt
@@ -97,10 +97,11 @@ class NoisyDQN(object):
         self.action_space = env.action_space
         self.featureExtractor = opt.featExtractor(env)
         self.test=False
+        self.prior=opt.prior
 
         #Compteur
         self.nbEvents=0
-        self.events=Memory(self.capacity,prior=prior)
+        self.events=Memory(self.capacity,prior=self.prior)
 
         #Model
         self.Q=NoisyNN(self.env.observation_space.shape[0],self.action_space.n , layers=layers, activation=activation,dropout=dropout)
@@ -180,7 +181,7 @@ class NoisyDQN(object):
    
 if __name__ == '__main__':
 
-    env, config, outdir, logger = init('./configs/config_random_cartpole.yaml', "Noisy_DQN")
+    env, config, outdir, logger = init('./configs/config_random_lunar.yaml', "Noisy_DQN_lr_0.0003")
 
     freqTest = config["freqTest"]
     freqSave = config["freqSave"]
@@ -189,7 +190,7 @@ if __name__ == '__main__':
     np.random.seed(config["seed"])
     episode_count = config["nbEpisodes"]
 
-    agent = NoisyDQN(env,config,prior=False,activation=nn.Tanh,dropout=0.0)
+    agent = NoisyDQN(env,config,activation=nn.Tanh,dropout=0.0)
 
 
     rsum = 0

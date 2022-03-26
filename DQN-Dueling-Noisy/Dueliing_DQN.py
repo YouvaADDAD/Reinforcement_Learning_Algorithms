@@ -32,14 +32,14 @@ class NNDqn(nn.Module):
         features=self.feature_layer(x)
         advantage=self.advantage_layer(features)
         values=self.value_layer(features)
-        return values + advantage - advantage.mean()#advantage.mean(dim=-1,keepdim=True)
+        return values + advantage - advantage.mean()
 
     def setcuda(self, device):
         self.cuda(device=device)
 
 
 class DuelingDQN(object):
-    def __init__(self, env,opt,layers=[200],activation=torch.tanh,droppout=0.0,prior=True):
+    def __init__(self, env,opt,layers=[200],activation=torch.tanh,droppout=0.0):
         super().__init__()
         
         #Les hyperparametres
@@ -58,10 +58,10 @@ class DuelingDQN(object):
         self.explo=opt.explo
         self.min_explo=0.0001
         self.max_explo=opt.explo
-
+        self.prior=opt.prior
         #Compteur
         self.nbEvents=0
-        self.events=Memory(self.capacity,prior=prior)
+        self.events=Memory(self.capacity,prior=self.prior)
 
 
         self.Q=NNDqn(self.env.observation_space.shape[0],self.action_space.n , layers=layers, activation=activation,dropout=droppout)
@@ -109,6 +109,7 @@ class DuelingDQN(object):
 
     def decays_eps(self,t):
         self.explo=max(self.max_explo * np.exp(-t * self.decay),self.min_explo)
+        #self.explo=max(self.explo*self.decay,self.min_explo)
         
 
     def learn(self):
@@ -142,7 +143,7 @@ class DuelingDQN(object):
             
 
 if __name__ == '__main__':
-    env, config, outdir, logger = init('./configs/config_random_cartpole.yaml', "Dueling-DQN")
+    env, config, outdir, logger = init('./configs/config_random_lunar.yaml', "Dueling-DQN")
 
     freqTest = config["freqTest"]
     freqSave = config["freqSave"]
@@ -217,9 +218,7 @@ if __name__ == '__main__':
 
             if agent.timeToLearn(done):
                 agent.learn()
-            
             agent.decays_eps(i)
-            
             if done :
                 print(str(i) + " rsum=" + str(rsum) + ", " + str(j) + " actions ")
                 if not agent.test:

@@ -66,7 +66,7 @@ class Buffer(object):
         return len(self.observations)
 
 class PPO(object):
-    def __init__(self, env,opt,layers=[30,30],K=30,beta=1,delta=0.5,ε=0.2):
+    def __init__(self, env,opt,layers=[30,30]):
          #Environment 
         self.env=env
         self.opt=opt
@@ -85,10 +85,8 @@ class PPO(object):
         self.nbEvents=0
 
         #Parameters PPO
-        self.K=K
-        self.beta=beta
-        self.delta=delta
-        self.ε=ε
+        self.K=opt.K
+        self.ε=opt.ε
         #Actor Critic
         self.model=ActorCritic(self.env.observation_space.shape[0],self.action_space.n , layers=layers,finalActivation=nn.Softmax(dim=1), activation=torch.tanh,dropout=0.0)
 
@@ -126,20 +124,21 @@ class PPO(object):
         return action.item(),values,dist.log_prob(action)
 
     def discount_rewards_(self,rewards,dones,values):
-        next_value=0
-        gae=0.
-        returns=[]
-        for step in reversed(range(len(rewards))):
-            TD=rewards[step]+self.gamma*next_value*(1-dones[step])-values[step]
-            gae=TD+self.gamma*self.Lambda*(1-dones[step])*gae
-            next_value= values[step]
-            returns.append(gae+values[step])
-        return torch.tensor(returns[::-1])
+        with torch.no_grad():
+            next_value=0
+            gae=0.
+            returns=[]
+            for step in reversed(range(len(rewards))):
+                TD=rewards[step]+self.gamma*next_value*(1-dones[step])-values[step]
+                gae=TD+self.gamma*self.Lambda*(1-dones[step])*gae
+                next_value= values[step]
+                returns.append(gae+values[step])
+            return torch.tensor(returns[::-1])
     
     def learn(self):
+        self.nbEvents+=1
         if self.test:
-            pass
-        
+            pass     
         else:
             old_states,actions,rewards,dones,old_values,old_logprobs=self.events.sample()
             old_states=torch.FloatTensor(old_states).squeeze(1)
@@ -148,7 +147,7 @@ class PPO(object):
             dones=torch.FloatTensor(dones)
             old_values=torch.FloatTensor(old_values)
             old_logprobs=torch.FloatTensor(old_logprobs)
-            returns=self.discount_rewards_(rewards,dones,old_values.detach())
+            returns=self.discount_rewards_(rewards,dones,old_values)
             advantages=returns-old_values
             ###############################################################################
             for _ in range(self.K):
@@ -165,12 +164,14 @@ class PPO(object):
                 self.policy_optim.zero_grad()
                 actor_loss.backward()
                 self.policy_optim.step()  
-            ########################################
-            new_values,new_policy_dist = self.model(old_states) 
-            critic_loss=self.loss(returns,new_values)
-            self.critic_optim.zero_grad()
-            critic_loss.backward()
-            self.critic_optim.step()
+            ################################################################
+            for _ in range(self.K):
+                new_values,new_policy_dist = self.model(old_states)
+                new_values=new_values.squeeze(-1) 
+                critic_loss=self.loss(returns,new_values)
+                self.critic_optim.zero_grad()
+                critic_loss.backward()
+                self.critic_optim.step()
             self.events.reset()
 
 
@@ -178,7 +179,7 @@ if __name__ == '__main__':
     #config_random_gridworld.yaml
     #config_random_cartpole.yaml
     #config_random_lunar.yaml
-    env, config, outdir, logger = init('./configs/config_random_cartpole.yaml', "PPO_KL")
+    env, config, outdir, logger = init('./configs/config_random_lunar.yaml', "PPO_Clip_K_3_ε_0.2_lr_v_0.0001")
     freqTest = config["freqTest"]
     freqSave = config["freqSave"]
     nbTest = config["nbTest"]
@@ -186,7 +187,7 @@ if __name__ == '__main__':
     np.random.seed(config["seed"])
     episode_count = config["nbEpisodes"]
 
-    agent = PPO(env,config,K=20)
+    agent = PPO(env,config)
 
 
     rsum = 0
@@ -248,14 +249,16 @@ if __name__ == '__main__':
             agent.store(ob, action,reward,done,value,log_prob,j)
             rsum += reward
 
-            if agent.timeToLearn(done):
-                agent.learn()
+            #if agent.timeToLearn(done):
+            #    agent.learn()
             if done:
                 print(str(i) + " rsum=" + str(rsum) + ", " + str(j) + " actions ")
                 logger.direct_write("reward", rsum, i)
                 mean += rsum
                 rsum = 0
                 break
+        
+        agent.learn()
 
     env.close()
 

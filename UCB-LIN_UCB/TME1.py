@@ -76,3 +76,25 @@ def LinUCB(features,data,alpha=0.1):
         A[max_arms]+=np.dot(x_t,x_t.T)
         b[max_arms]+=reward*x_t
     return np.cumsum(rewards)
+
+def LinUCB2(features,data,alpha=0.1):
+    T,K=data.shape
+    dim=len(features[0])
+    A={}
+    b={}
+    rewards=[]
+    for t in range(T):
+        x_t_a=features[t].reshape((dim,1))
+        p_t = np.zeros(K)
+        for a in range(K):
+            if(A.get(a) is None):
+                A[a] = np.identity(dim)
+                b[a] = np.zeros((dim,1))
+            inv_A=np.linalg.inv(A[a])
+            theta=inv_A@b[a]
+            p_t[a]=theta.T@x_t_a+alpha*np.sqrt(x_t_a.T@inv_A@x_t_a)
+        action = p_t.argmax()
+        rewards.append(data[t,action]) 
+        A[action] += x_t_a @ x_t_a.T
+        b[action] += data[t,action] * x_t_a
+    return np.cumsum(rewards)

@@ -21,7 +21,7 @@ from copy import deepcopy
 import torch
 
 class DQN(object):
-    def __init__(self, env,opt,layers=[200],activation=torch.tanh,dropout=0.0,prior=True):
+    def __init__(self, env,opt,layers=[200],activation=torch.tanh,dropout=0.0):
         super().__init__()
         #Les hyperparametres
         self.opt=opt
@@ -33,6 +33,8 @@ class DQN(object):
         self.action_space = env.action_space
         self.featureExtractor = opt.featExtractor(env)
         self.test=False
+        self.use_target=opt.target
+        self.prior=opt.prior
 
         #Exploration
         self.decay=opt.decay
@@ -42,7 +44,7 @@ class DQN(object):
 
         #Compteur
         self.nbEvents=0
-        self.events=Memory(self.capacity,prior=prior)
+        self.events=Memory(self.capacity,prior=self.prior)
 
         #Model
         self.Q=NN(self.env.observation_space.shape[0],self.action_space.n , layers=layers, activation=activation,dropout=dropout)
@@ -61,10 +63,10 @@ class DQN(object):
                 return self.Q(obs).argmax(dim=-1).item()
     
 
-    def decays_eps(self,t):
-        #self.explo*=self.decay
+    def decays_eps(self,):
         #self.explo=np.clip(self.explo,self.min_explo,self.max_explo)
-        self.explo=max(self.max_explo * np.exp(-t * self.decay),self.min_explo)
+        #self.explo=max(self.max_explo * np.exp(-t * self.decay),self.min_explo)
+        self.explo=max(self.explo*self.decay,self.min_explo)
 
 
     def store(self,ob, action, new_ob, reward, done, it):
@@ -89,14 +91,11 @@ class DQN(object):
     
         # sauvegarde du modèle
     
-
     def save(self,outputDir):
-        pass
-    
+        pass 
     # chargement du modèle.
     def load(self,inputDir):
         pass
-
 
     def learn(self):
         # Si l'agent est en mode de test, on n'entraîne pas
@@ -114,7 +113,10 @@ class DQN(object):
             ###########################################################################
             q=self.Q(ls0)[range(self.batch_size),la]
             with torch.no_grad():
-                qhat=self.Qhat(ls1)
+                if self.use_target:
+                    qhat=self.Qhat(ls1)
+                else:
+                    qhat=self.Q(ls1)
                 #Prendre les valeurs max
                 vmax=qhat.max(dim=-1)[0]
                 y=lr + self.gamma * vmax * (1-ld)
@@ -129,16 +131,17 @@ class DQN(object):
             
    
 if __name__ == '__main__':
-    env, config, outdir, logger = init('./configs/config_random_cartpole.yaml', "DQN")
+    env, config, outdir, logger = init('./configs/config_random_lunar.yaml', "DQN")
 
     freqTest = config["freqTest"]
     freqSave = config["freqSave"]
     nbTest = config["nbTest"]
     env.seed(config["seed"])
     np.random.seed(config["seed"])
+    torch.manual_seed(config["seed"])
     episode_count = config["nbEpisodes"]
 
-    agent = DQN(env,config,prior=False,activation=torch.tanh,dropout=0.0)
+    agent = DQN(env,config,activation=torch.tanh,dropout=0.0)
 
 
     rsum = 0
@@ -200,13 +203,12 @@ if __name__ == '__main__':
 
             agent.store(ob, action, new_ob, reward, done,j)
             rsum += reward
-
             if agent.timeToLearn(done):
                 agent.learn()
             
             #Decay a chaque evenement 
             if not agent.test:
-                agent.decays_eps(i)
+                agent.decays_eps()
 
             if done :
                 print(str(i) + " rsum=" + str(rsum) + ", " + str(j) + " actions ")

@@ -33,7 +33,7 @@ class DynaQ(object):
         self.P={}
         self.R={}
         self.nbEvents=0
-        self.alpha_R=0.5
+        self.alpha_R=0.1
 
     def save(self,file):
        pass
@@ -66,8 +66,10 @@ class DynaQ(object):
         return self.action_space.sample()
     
     def decay_eps(self):
-        self.explo*=self.decay
-        self.alpha_R*=self.decay
+        #self.explo=max(self.max_explo * np.exp(-t * self.decay),self.min_explo)
+        self.explo=min(self.explo*self.decay,self.min_explo)
+        #self.alpha_R*=self.decay
+
 
     def store(self, ob, action, new_ob, reward, done, it):
 
@@ -91,7 +93,8 @@ class DynaQ(object):
 
     def learn(self, done):
         #TODO
-        
+        if self.test:
+            return 
         state, action, reward, next_state,done = self.last_source,self.last_action,self.last_reward,self.last_dest,self.last_done
         ############UPDATE Q###########
         self.values[state][action]+=self.alpha*(reward + self.discount * (1-done) * np.max(self.values[next_state]) - self.values[state][action])
@@ -104,13 +107,15 @@ class DynaQ(object):
 
 
     def plan(self):
+        if self.test:
+            return
         for _ in range(self.n_plan):
             state,action=random.choice(list(self.model.keys()))
             somme_over=np.sum([self.P.get((state,action,next_state),0) * ((self.R.get((state,action,next_state),0))+self.discount*np.max(self.values[next_state])) for next_state in self.qstates.values()])
             self.values[state][action]+=self.alpha*(somme_over-self.values[state][action])
 
 if __name__ == '__main__':
-    env,config,outdir,logger=init('./configs/config_qlearning_gridworld.yaml',"DynaQ_plan_5")
+    env,config,outdir,logger=init('./configs/config_qlearning_gridworld.yaml',"DynaQ_plan_5_explo_0.1")
     freqTest = config["freqTest"]
     freqSave = config["freqSave"]
     nbTest = config["nbTest"]
@@ -135,7 +140,7 @@ if __name__ == '__main__':
         ob = env.reset()
 
         if (i > 0 and i % int(config["freqVerbose"]) == 0):
-            verbose = False
+            verbose = True
         else:
             verbose = False
 
@@ -155,11 +160,13 @@ if __name__ == '__main__':
 
         j = 0
         if verbose:
-            env.render()
+            #env.render()
+            pass
         new_ob = agent.storeState(ob)
         while True:
             if verbose:
-                env.render()
+                #env.render()
+                pass
 
             ob = new_ob
             action = agent.act(ob)

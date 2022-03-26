@@ -26,6 +26,7 @@ class QLearning(object):
         self.decay=opt.decay
         self.modelSamples=opt.nbModelSamples
         self.test=False
+        self.min_explo=0.0001
         self.qstates = {}  # dictionnaire d'états rencontrés
         self.values = []   # contient, pour chaque numéro d'état, les qvaleurs des self.action_space.n actions possibles
 
@@ -81,6 +82,8 @@ class QLearning(object):
 
     def learn(self, done):
         #TODO
+        if self.test:
+            return 
         state, action, reward, next_state = self.last_source,self.last_action,self.last_reward,self.last_dest
         if(self.sarsa):
             next_action=self.act(next_state)
@@ -89,10 +92,10 @@ class QLearning(object):
             self.values[state][action]+=self.alpha*(reward + self.discount * (1-done) * np.max(self.values[next_state]) - self.values[state][action])
 
     def decay_eps(self):
-        self.explo*=self.decay
+        self.explo=min(self.explo*self.decay,self.min_explo)
 
 if __name__ == '__main__':
-    env,config,outdir,logger=init('./configs/config_qlearning_gridworld.yaml',"QLearning_sarsa_plan_5")
+    env,config,outdir,logger=init('./configs/config_qlearning_gridworld.yaml',"sarsa_plan_5_explo_0.1")
 
     freqTest = config["freqTest"]
     freqSave = config["freqSave"]

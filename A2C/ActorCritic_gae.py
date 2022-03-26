@@ -59,7 +59,8 @@ class A2C(object):
         self.target=deepcopy(self.model)
 
         #Optimizer
-        self.optim=torch.optim.Adam(params=self.model.parameters(),weight_decay=0.0,lr=opt.lr)
+        #self.optim=torch.optim.Adam(params=self.model.parameters(),weight_decay=0.0,lr=opt.lr)
+        self.optim=torch.optim.RMSprop(params=self.model.parameters(),weight_decay=0.0,lr=opt.lr,alpha=0.99)
 
         #Loss
         self.loss=nn.SmoothL1Loss()
@@ -90,15 +91,16 @@ class A2C(object):
     
     
     def discount_rewards_(self,rewards,dones,values):
-        next_value=0
-        gae=0.
-        returns=[]
-        for step in reversed(range(len(rewards))):
-            TD=rewards[step]+self.gamma*next_value*(1-dones[step])-values[step]
-            gae=TD+self.gamma*self.Lambda*(1-dones[step])*gae
-            next_value= values[step]
-            returns.append(gae+values[step])
-        return torch.tensor(returns[::-1])
+        with torch.no_grad():
+            next_value=0
+            gae=0.
+            returns=[]
+            for step in reversed(range(len(rewards))):
+                TD=rewards[step]+self.gamma*next_value*(1-dones[step])-values[step]
+                gae=TD+self.gamma*self.Lambda*(1-dones[step])*gae
+                next_value= values[step]
+                returns.append(gae+values[step])
+            return torch.tensor(returns[::-1])
 
 
     def learn(self):
@@ -130,7 +132,7 @@ if __name__ == '__main__':
     #config_random_gridworld.yaml
     #config_random_cartpole.yaml
     #config_random_lunar.yaml
-    env, config, outdir, logger = init('./configs/config_random_cartpole.yaml', "A2C")
+    env, config, outdir, logger = init('./configs/config_random_lunar.yaml', "A2C_gae") 
     freqTest = config["freqTest"]
     freqSave = config["freqSave"]
     nbTest = config["nbTest"]

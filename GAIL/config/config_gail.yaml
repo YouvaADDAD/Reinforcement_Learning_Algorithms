@@ -1,0 +1,35 @@
+env: LunarLander-v2
+path: "./expert.pkl"
+freqOptim: 1000
+freqTest: 100
+nbTest: 1
+freqVerbose: 1
+freqSave: 1000
+fromFile: null
+maxLengthTest: 500                                                                    
+maxLengthTrain: 500
+nbEpisodes: 100000
+startEvents: 100
+seed: 5 
+discriminator_activation: !!python/name:torch.nn.Tanh
+discriminator_factivation: null
+discriminator_layers:              
+- 100
+- 100
+ac_activation: !!python/name:torch.nn.LeakyReLU
+ac_layers:
+- 100
+- 100
+lr_pi: 0.0003
+lr_q: 0.0003
+lr_disc: 0.0003
+eps_clip: 0.2
+gamma: 0.99
+rhu : 0.95
+Lambda: 0.95
+numberOptimAC: 10
+numberOptimDiscriminator: 10
+batchsize: 256
+sigma_noise: 0.2
+reg_entropy: 0.001
+maxReward: 100

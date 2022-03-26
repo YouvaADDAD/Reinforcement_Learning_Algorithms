@@ -86,17 +86,21 @@ class DynaQ(object):
 
     def learn(self, done):
         #TODO
+        if self.test:
+            return
         state, action, reward, next_state = self.last_source,self.last_action,self.last_reward,self.last_dest
         self.values[state][action]+=self.alpha*(reward + self.discount * (1-done) * np.max(self.values[next_state]) - self.values[state][action])
 
     def plan(self):
+        if self.test:
+            return 
         for _ in range(self.n_plan):
             state,action=random.choice(list(self.model.keys()))
             reward,next_state=self.model[(state,action)]
             self.values[state][action]+=self.alpha*(reward + self.discount *  np.max(self.values[next_state]) - self.values[state][action])
             
 if __name__ == '__main__':
-    env,config,outdir,logger=init('./configs/config_qlearning_gridworld.yaml',"DynaQ_plan_5")
+    env,config,outdir,logger=init('./configs/config_qlearning_gridworld.yaml',"DynaQ_plan_5_0.")
     freqTest = config["freqTest"]
     freqSave = config["freqSave"]
     nbTest = config["nbTest"]
@@ -161,10 +165,9 @@ if __name__ == '__main__':
 
             agent.store(ob, action, new_ob, reward, done, j)
             agent.nbEvents+=1
-            if not agent.test:
-                agent.learn(done)
-            if len(agent.model)>agent.n_plan+50 and not agent.test:
-                agent.plan()
+
+            agent.learn(done)
+            agent.plan()
             rsum += reward
             if done:
                 print(str(i) + " rsum=" + str(rsum) + ", " + str(j) + " actions ")

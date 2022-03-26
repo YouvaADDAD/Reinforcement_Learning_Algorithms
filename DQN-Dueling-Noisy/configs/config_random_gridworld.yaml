@@ -22,8 +22,9 @@ gamma: 0.999
 batch_size: 100
 decay: 0.99999
 explo: 0.1
+prior: true
+target: false
 C: 1000
 capacity: 10000
-optimStep: 10
 execute: |                                                                            # a executer apres le chargement de l'environnement
     env.setPlan(config["map"], config["rewards"])

@@ -6,7 +6,10 @@ import gridworld
 from gym import wrappers, logger
 import numpy as np
 import copy
+import matplotlib.pyplot as plt
 from randomAgent import RandomAgent
+import time
+from torch.utils.tensorboard import SummaryWriter
 
 
 class PolicyIteration(RandomAgent):
@@ -21,39 +24,51 @@ class PolicyIteration(RandomAgent):
         self.n_states=len(self.states)
         self.policy = np.array([self.actions.sample() for _ in range(self.n_states)])
         self.value  = np.zeros(self.n_states)
-
-    
+ 
     def act(self, observation):
          return self.policy[observation]
+    
+    #Pour juste une étape
+    def learn_step(self):
+        value_new = np.zeros(self.n_states)
+        while True:
+            for s in self.mdp.keys():
+                action=self.policy[s]
+                value_new[s]=np.sum([proba * (reward+self.gamma*(1-done)*self.value[next_state])  for proba,next_state,reward,done in  self.mdp[s].get(action)]) 
+            val=np.linalg.norm(self.value-value_new)
+            if val <= self.epsilon:
+                break
+            self.value=copy.deepcopy(value_new)
+        policy_new=np.zeros(self.n_states,dtype=int)
+        for s in self.mdp.keys():
+            policy_new[s]=np.argmax([np.sum([proba_trans * (reward+self.gamma*(1-done)*self.value[s_prime])  for proba_trans,s_prime,reward,done in self.mdp[s].get(a)]) for a in range(self.n_action)])
+        self.policy=copy.deepcopy(policy_new)
 
+    #Apprend le tout
     def learn(self):
         while True:
             value_new = np.zeros(self.n_states)
-            while True :
+            while True:
                 for s in self.mdp.keys():
                     action=self.policy[s]
-                    value_new[s]=np.sum([proba * (reward+self.gamma*self.value[next_state])  for proba,next_state,reward,_ in  self.mdp[s].get(action)]) 
-                if np.linalg.norm(self.value-value_new)<=self.epsilon:
+                    value_new[s]=np.sum([proba * (reward+self.gamma*(1-done)*self.value[next_state])  for proba,next_state,reward,done in  self.mdp[s].get(action)]) 
+                val=np.linalg.norm(self.value-value_new)
+                if val <= self.epsilon:
                     break
                 self.value=copy.deepcopy(value_new)
-            
             policy_new=np.zeros(self.n_states,dtype=int)
             for s in self.mdp.keys():
-                policy_new[s]=np.argmax([np.sum([proba_trans * (reward+self.gamma*self.value[s_prime])  for proba_trans,s_prime,reward,_ in self.mdp[s].get(a)]) for a in range(self.n_action)])
-
+                policy_new[s]=np.argmax([np.sum([proba_trans * (reward+self.gamma*(1-done)*self.value[s_prime])  for proba_trans,s_prime,reward,done in self.mdp[s].get(a)]) for a in range(self.n_action)])
             if np.all(policy_new ==self.policy) :
                 break
-
             self.policy=copy.deepcopy(policy_new)
-
-                
+      
 
 
 if __name__ == '__main__':
 
-
     env = gym.make("gridworld-v0")
-    env.setPlan("gridworldPlans/plan1.txt", {0: -0.001, 3: 1, 4: 1, 5: -1, 6: -1})
+    env.setPlan("gridworldPlans/plan6.txt", {0: -0.001, 3: 1, 4: 1, 5: -1, 6: -1})
     env.reset()
     env.seed(0)  # Initialise le seed du pseudo-random
     print(env.action_space)  # Quelles sont les actions possibles
@@ -68,7 +83,6 @@ if __name__ == '__main__':
     # Execution avec un Agent
     agent = PolicyIteration(env)
     agent.learn()
-
     episode_count = 1000
     reward = 0
     done = False
@@ -78,8 +92,7 @@ if __name__ == '__main__':
         obs = env.reset()
         env.verbose = (i % 100 == 0 and i > 0)  # afficher 1 episode sur 100
         if env.verbose:
-            #env.render(mode='rgb_array')
-            pass
+            env.render()
         j = 0
         rsum = 0
         while True:
@@ -88,8 +101,7 @@ if __name__ == '__main__':
             rsum += reward
             j += 1
             if env.verbose:
-                #env.render(mode='rgb_array')
-                pass
+                env.render()
             if done:
                 print("Episode : " + str(i) + " rsum=" + str(rsum) + ", " + str(j) + " actions")
                 break
